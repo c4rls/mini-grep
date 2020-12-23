@@ -74,6 +74,8 @@ impl Config {
             let flag = &args[3];
             if flag == "--case-insensitive" {
                 case_sensitive = false;
+            } else if flag == "--case-sensitive" {
+                case_sensitive = true;
             } else {
                 return Err("invalid flag");
             }
