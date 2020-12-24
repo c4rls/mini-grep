@@ -8,18 +8,19 @@ mod tests {
 
     #[test]
     fn insufficient_arguments() {
-        let args = [String::from("one"), String::from("two")];
-        assert_eq!(Config::new(&args), Err("not enough arguments"));
+        let args = vec![String::from("one"), String::from("two")].into_iter();
+        assert_eq!(Config::new(args), Err("Didn't get a filename"));
     }
 
     #[test]
     fn enough_arguments() {
-        let args = [
+        let args = vec![
             String::from("one"),
             String::from("two"),
             String::from("three"),
-        ];
-        if let Err(_) = Config::new(&args) {
+        ]
+        .into_iter();
+        if let Err(_) = Config::new(args) {
             panic!("the instance was not created");
         }
     }
@@ -60,26 +61,31 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new(args: &[String]) -> Result<Config, &'static str> {
-        if args.len() < 3 {
-            return Err("not enough arguments");
-        }
+    pub fn new<T: Iterator<Item = String>>(mut args: T) -> Result<Config, &'static str> {
+        args.next();
 
-        let query = args[1].clone();
-        let filename = args[2].clone();
+        let query = match args.next() {
+            Some(arg) => arg,
+            None => return Err("Didn't get a query string"),
+        };
 
-        let mut case_sensitive = env::var("CASE_INSENSITIVE").is_err();
+        let filename = match args.next() {
+            Some(arg) => arg,
+            None => return Err("Didn't get a filename"),
+        };
 
-        if args.len() > 3 {
-            let flag = &args[3];
-            if flag == "--case-insensitive" {
-                case_sensitive = false;
-            } else if flag == "--case-sensitive" {
-                case_sensitive = true;
-            } else {
-                return Err("invalid flag");
+        let case_sensitive = match args.next() {
+            Some(flag) => {
+                if flag == "--case-insensitive" {
+                    false
+                } else if flag == "--case-sensitive" {
+                    true
+                } else {
+                    return Err("invalid flag");
+                }
             }
-        }
+            None => env::var("CASE_INSENSITIVE").is_err(),
+        };
 
         Ok(Config {
             query,
@@ -106,24 +112,16 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
 }
 
 pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
-    let mut results = Vec::new();
-    for line in contents.lines() {
-        if line.contains(query) {
-            results.push(line);
-        }
-    }
-
-    results
+    contents
+        .lines()
+        .filter(|line| line.contains(query))
+        .collect()
 }
 
 pub fn search_case_insensitive<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
     let query = query.to_lowercase();
-    let mut results = Vec::new();
-    for line in contents.lines() {
-        if line.to_lowercase().contains(&query) {
-            results.push(line);
-        }
-    }
-
-    results
+    contents
+        .lines()
+        .filter(|line| line.to_lowercase().contains(&query))
+        .collect()
 }
